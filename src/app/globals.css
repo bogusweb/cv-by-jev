@@ -1,0 +1,163 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-display: var(--font-display);
+  --font-heading: var(--font-display);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /* Workshop ink + moss — brand tokens (do not clash with shadcn --accent/--muted) */
+  --ink: #142420;
+  --quiet: #5b6b64;
+  --panel: #f3f7f4;
+  --wash: #e7efe9;
+  --lime: #9dff6c;
+  --lime-strong: #7be84a;
+  --lime-soft: #e4fad4;
+  --danger: #b42318;
+  --danger-soft: #fce8e6;
+
+  --background: #dce8e1;
+  --foreground: #142420;
+  --card: #f3f7f4;
+  --card-foreground: #142420;
+  --popover: #ffffff;
+  --popover-foreground: #142420;
+  --primary: #142420;
+  --primary-foreground: #f4faf6;
+  --secondary: #e7efe9;
+  --secondary-foreground: #142420;
+  --muted: #e7efe9;
+  --muted-foreground: #5b6b64;
+  --accent: #e4fad4;
+  --accent-foreground: #142420;
+  --destructive: #b42318;
+  --border: color-mix(in oklab, #142420 18%, transparent);
+  --input: color-mix(in oklab, #142420 18%, transparent);
+  --ring: #2f6b45;
+  --chart-1: #2f6b45;
+  --chart-2: #9dff6c;
+  --chart-3: #142420;
+  --chart-4: #5b6b64;
+  --chart-5: #c7d9ce;
+  --radius: 0.35rem;
+  --sidebar: #f3f7f4;
+  --sidebar-foreground: #142420;
+  --sidebar-primary: #142420;
+  --sidebar-primary-foreground: #f4faf6;
+  --sidebar-accent: #e7efe9;
+  --sidebar-accent-foreground: #142420;
+  --sidebar-border: color-mix(in oklab, #142420 18%, transparent);
+  --sidebar-ring: #2f6b45;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display), ui-serif, Georgia, serif;
+  }
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-2%, 1.5%, 0);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-rise {
+  animation: rise 0.7s ease-out both;
+}
+
+.hero-rise-delay {
+  animation: rise 0.8s ease-out 0.12s both;
+}
+
+.hero-rise-delay-2 {
+  animation: rise 0.85s ease-out 0.22s both;
+}
+
+.bg-atmosphere {
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, #b8f08a55, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 90% 0%, #6aa88a33, transparent 50%),
+    linear-gradient(165deg, #e8f2ec 0%, #d5e4db 45%, #c8d9d0 100%);
+}
+
+.bg-atmosphere::before {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.45'/%3E%3C/svg%3E");
+  opacity: 0.12;
+  pointer-events: none;
+  animation: drift 18s linear infinite alternate;
+}
