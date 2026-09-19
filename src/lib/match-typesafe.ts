@@ -1,4 +1,5 @@
 import { TypeSafeClient, choice, noul, score } from "@typesafe-ai/sdk";
+import { getMessages, parseLocale, type Locale } from "@/lib/i18n";
 import type { MatchRecommendation, MatchResult } from "@/lib/types";
 import { scoreHeuristicMatch } from "@/lib/match-heuristic";
 import { EQUIVALENCE_NOUL_THRESHOLD } from "@/lib/skill-equivalence";
@@ -10,14 +11,6 @@ const WEIGHTS = {
   domain: 0.2,
   mustHaves: 0.2,
 } as const;
-
-const LEVELS = [
-  "Brak istotnego pokrycia",
-  "Słabe pokrycie",
-  "Umiarkowane pokrycie",
-  "Dobre pokrycie",
-  "Bardzo dobre pokrycie",
-] as const;
 
 const MAX_GAP_NOULS = 8;
 
@@ -48,7 +41,10 @@ export async function scoreTypeSafeMatch(input: {
   jobText: string;
   jobUrl: string;
   jobTitle?: string;
+  locale?: Locale;
 }): Promise<MatchResult> {
+  const locale = parseLocale(input.locale);
+  const t = getMessages(locale).typesafe;
   const client = new TypeSafeClient({
     apiKey: process.env.TYPESAFE_API_KEY,
     defaultModel: "jev-latest",
@@ -58,15 +54,13 @@ export async function scoreTypeSafeMatch(input: {
   const job = input.jobText.slice(0, 12_000);
 
   // Heuristic first: candidate gaps for per-skill Noul (Jev cannot emit string lists).
-  const heuristic = scoreHeuristicMatch(input);
+  const heuristic = scoreHeuristicMatch({ ...input, locale });
   const candidateGaps = heuristic.missingSkills.slice(0, MAX_GAP_NOULS);
 
   const gapQuestions = Object.fromEntries(
     candidateGaps.map((skill, index) => [
       gapQuestionKey(index),
-      noul(
-        `Czy wymaganie skill „${skill}” z oferty jest pokryte przez równoważny, pokrewny lub transferowalny skill obecny w CV? Przykłady: TypeScript pokrywa JavaScript; Next.js pokrywa React; Spring pokrywa Java; Tailwind pokrywa CSS. Jeśli w CV jest bezpośrednio „${skill}”, też tak.`,
-      ),
+      noul(t.gapQuestion(skill)),
     ]),
   );
 
@@ -75,7 +69,7 @@ export async function scoreTypeSafeMatch(input: {
   const response = await client.systemOne({
     model: "jev-latest",
     state: {
-      task: "Oceń dopasowanie CV kandydata do oferty pracy, w tym równoważność skills.",
+      task: t.task,
       cv,
       job,
       url: input.jobUrl,
@@ -90,36 +84,17 @@ export async function scoreTypeSafeMatch(input: {
       ],
     },
     questions: {
-      skillsFit: score(
-        "Jak dobrze umiejętności i stack z CV pokrywają wymagania oferty?",
-        [...LEVELS],
-      ),
-      experienceFit: score(
-        "Jak dobrze doświadczenie i seniority z CV pasują do oferty?",
-        [...LEVELS],
-      ),
-      domainFit: score(
-        "Jak dobrze domena / branża / kontekst CV pasuje do oferty?",
-        [...LEVELS],
-      ),
-      meetsMustHaves: noul(
-        "Czy CV spełnia twarde must-have wymagania tej oferty (języki, lata doświadczenia, obowiązkowe technologie)?",
-      ),
-      equivalenceCoverage: score(
-        "Po uwzględnieniu równoważności i transferowalności skills (np. TypeScript↔JavaScript, React↔Next.js, Java↔Spring, CSS↔Tailwind): jak dobrze CV pokrywa wymagania oferty, które wyglądają na brakujące przy prostym porównaniu stringów?",
-        [...LEVELS],
-      ),
-      stillHasCriticalGaps: noul(
-        "Czy po uwzględnieniu równoważnych i pokrewnych skills nadal brakuje istotnych technologii wymaganych w ofercie?",
-      ),
-      recommend: choice(
-        "Czy kandydat powinien aplikować na tę ofertę?",
-        {
-          apply: "Tak — warto aplikować",
-          maybe: "Może — aplikować po dopracowaniu CV lub z zastrzeżeniami",
-          skip: "Nie — lepiej pominąć tę ofertę",
-        },
-      ),
+      skillsFit: score(t.skillsFit, [...t.levels]),
+      experienceFit: score(t.experienceFit, [...t.levels]),
+      domainFit: score(t.domainFit, [...t.levels]),
+      meetsMustHaves: noul(t.meetsMustHaves),
+      equivalenceCoverage: score(t.equivalenceCoverage, [...t.levels]),
+      stillHasCriticalGaps: noul(t.stillHasCriticalGaps),
+      recommend: choice(t.recommendPrompt, {
+        apply: t.recommendApply,
+        maybe: t.recommendMaybe,
+        skip: t.recommendSkip,
+      }),
       ...gapQuestions,
     },
   });
@@ -178,10 +153,10 @@ export async function scoreTypeSafeMatch(input: {
 
   const summary =
     gatedRecommendation === "apply"
-      ? `Jev (composite) ocenia dopasowanie na ${percent}/100 — silne pokrycie umiejętności i must-have.`
+      ? t.summaryApply(percent)
       : gatedRecommendation === "maybe"
-        ? `Jev (composite) ocenia dopasowanie na ${percent}/100 — częściowe pokrycie; warto dopracować CV.`
-        : `Jev (composite) ocenia dopasowanie na ${percent}/100 — słabe pokrycie względem tej oferty.`;
+        ? t.summaryMaybe(percent)
+        : t.summarySkip(percent);
 
   const confidences = [
     response.answers.skillsFit.confidence,
@@ -197,23 +172,23 @@ export async function scoreTypeSafeMatch(input: {
   if (coveredByEquivalence.length) {
     equivalenceHighlights.push({
       kind: "match" as const,
-      label: "Pokryte równoważnymi skillami",
+      label: t.labelEquivalence,
       detail: coveredByEquivalence.slice(0, 8).join(", "),
     });
   }
   if (stillMissing.length || stillHasCriticalGaps >= 0.5) {
     equivalenceHighlights.push({
       kind: "gap" as const,
-      label: "Nadal brakuje",
+      label: t.labelMissing,
       detail:
         stillMissing.slice(0, 8).join(", ") ||
-        `P(istotne luki po równoważności)=${stillHasCriticalGaps.toFixed(2)}`,
+        t.criticalGapsFallback(stillHasCriticalGaps.toFixed(2)),
     });
   }
   equivalenceHighlights.push({
     kind: "note" as const,
-    label: "Równoważność skills (Jev)",
-    detail: `equivalenceCoverage=${Math.round(equivalence * 100)}, P(nadal krytyczne luki)=${stillHasCriticalGaps.toFixed(2)}`,
+    label: t.labelEquivalenceNote,
+    detail: `equivalenceCoverage=${Math.round(equivalence * 100)}, P(criticalGaps)=${stillHasCriticalGaps.toFixed(2)}`,
   });
 
   return {
@@ -223,17 +198,17 @@ export async function scoreTypeSafeMatch(input: {
     highlights: [
       {
         kind: "match",
-        label: "Wymiary composite",
+        label: t.labelComposite,
         detail: `skills=${Math.round(skills * 100)}, experience=${Math.round(experience * 100)}, domain=${Math.round(domain * 100)}, mustHaves=${Math.round(mustHaves * 100)}`,
       },
       {
         kind: mustHaves >= 0.5 ? "match" : "gap",
-        label: "Must-have (Noul)",
-        detail: `P(spełnia must-have)=${mustHaves.toFixed(2)}`,
+        label: t.labelMustHave,
+        detail: `P(must-have)=${mustHaves.toFixed(2)}`,
       },
       {
         kind: "note",
-        label: "Wagi w kodzie",
+        label: t.labelWeights,
         detail: `skills ${WEIGHTS.skills}, experience ${WEIGHTS.experience}, domain ${WEIGHTS.domain}, mustHaves ${WEIGHTS.mustHaves}`,
       },
       ...equivalenceHighlights,
@@ -241,8 +216,8 @@ export async function scoreTypeSafeMatch(input: {
         .filter(
           (h) =>
             h.kind !== "note" &&
-            h.label !== "Pokryte równoważnymi skillami" &&
-            h.label !== "Nadal brakuje",
+            h.label !== t.labelEquivalence &&
+            h.label !== t.labelMissing,
         )
         .slice(0, 1),
     ],
