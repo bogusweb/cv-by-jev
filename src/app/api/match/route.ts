@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchJobListing, JobFetchError } from "@/lib/job-fetch";
+import { getMessages, parseLocale } from "@/lib/i18n";
 import { runMatch } from "@/lib/match";
 import { extractPdfText, PdfExtractionError } from "@/lib/pdf";
 import type { MatchErrorBody } from "@/lib/types";
@@ -14,47 +15,54 @@ function errorResponse(
 }
 
 export async function POST(request: Request) {
+  const form = await request.formData();
+  const locale = parseLocale(form.get("locale"));
+  const t = getMessages(locale).api;
+
   try {
-    const form = await request.formData();
     const file = form.get("cv");
     const jobUrl = String(form.get("jobUrl") ?? "").trim();
 
     if (!(file instanceof File)) {
       return errorResponse(400, {
-        error: "Dołącz plik PDF z CV.",
+        error: t.invalidCv,
         code: "INVALID_INPUT",
       });
     }
 
-    if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
+    if (
+      !file.name.toLowerCase().endsWith(".pdf") &&
+      file.type !== "application/pdf"
+    ) {
       return errorResponse(400, {
-        error: "CV musi być plikiem PDF.",
+        error: t.invalidPdf,
         code: "INVALID_INPUT",
       });
     }
 
     if (file.size > 8 * 1024 * 1024) {
       return errorResponse(400, {
-        error: "Plik PDF jest za duży (limit 8 MB).",
+        error: t.pdfTooLarge,
         code: "INVALID_INPUT",
       });
     }
 
     if (!jobUrl) {
       return errorResponse(400, {
-        error: "Wklej adres URL oferty pracy.",
+        error: t.missingJobUrl,
         code: "INVALID_INPUT",
       });
     }
 
     const buffer = await file.arrayBuffer();
-    const cvText = await extractPdfText(buffer);
-    const job = await fetchJobListing(jobUrl);
+    const cvText = await extractPdfText(buffer, locale);
+    const job = await fetchJobListing(jobUrl, locale);
     const result = await runMatch({
       cvText,
       jobText: job.text,
       jobUrl: job.url,
       jobTitle: job.title,
+      locale,
     });
 
     return NextResponse.json(result);
@@ -75,7 +83,7 @@ export async function POST(request: Request) {
 
     console.error("Unexpected /api/match error:", error);
     return errorResponse(500, {
-      error: "Coś poszło nie tak podczas dopasowania. Spróbuj ponownie.",
+      error: t.matchFailed,
       code: "MATCH_FAILED",
     });
   }
