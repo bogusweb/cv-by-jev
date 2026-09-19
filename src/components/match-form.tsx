@@ -168,7 +168,7 @@ export function MatchForm() {
             {messages.form.jobLabel}
           </Label>
           <div className="relative">
-            <Link2 className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[var(--quiet)] />
+            <Link2 className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[var(--quiet)]" />
             <Input
               id="jobUrl"
               name="jobUrl"
