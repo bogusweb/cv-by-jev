@@ -132,6 +132,20 @@ export type Messages = {
   };
 };
 
+/** 1 wymaganie · 2–4 wymagania · 5+ / 12–14 wymagań */
+function plNoun(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(Math.trunc(n));
+  if (abs === 1) return one;
+  const mod10 = abs % 10;
+  const mod100 = abs % 100;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
+function plWymagan(n: number): string {
+  return `${n} ${plNoun(n, "wymaganie", "wymagania", "wymagań")}`;
+}
+
 const pl: Messages = {
   meta: {
     description:
@@ -139,15 +153,16 @@ const pl: Messages = {
   },
   chrome: {
     tagline: "Match · PDF · URL",
-    ready: "TypeSafe Jev ready",
-    footer: "OCR skanów i pełny tuning wag composite — w kolejnych iteracjach.",
+    ready: "Jev (TypeSafe) jest gotowy",
+    footer:
+      "OCR skanów i dopracowanie wag łącznego wyniku — w kolejnych wersjach.",
     langLabel: "Język",
     langPl: "PL",
     langEn: "EN",
   },
   hero: {
     headline: "Sprawdź, czy Twoje CV pasuje do oferty.",
-    sub: "Wgraj PDF, wklej link do ogłoszenia — dostaniesz score, rekomendację i konkretne sygnały dopasowania.",
+    sub: "Wgraj PDF, wklej link do ogłoszenia — dostaniesz wynik, rekomendację i konkretne wskazówki, co pasuje, a czego brakuje.",
   },
   form: {
     steps: "Krok 1–2",
@@ -159,7 +174,7 @@ const pl: Messages = {
     cvHint: "Max 8 MB · skany bez OCR w MVP",
     jobLabel: "URL oferty pracy",
     submit: "Sprawdź dopasowanie",
-    submitting: "Dopasowuję…",
+    submitting: "Sprawdzam dopasowanie…",
     missingCv: "Dołącz plik PDF z CV.",
     missingUrl: "Wklej adres URL oferty pracy.",
     networkError: "Błąd sieci. Sprawdź połączenie i spróbuj ponownie.",
@@ -167,17 +182,17 @@ const pl: Messages = {
   },
   result: {
     idleEyebrow: "Wynik",
-    idleTitle: "Tu pojawi się score",
+    idleTitle: "Tu pojawi się wynik",
     idleBody:
-      "Po wysłaniu zobaczysz metryki (composite, skills, doświadczenie, domena, must-have, równoważność, pewność) oraz uzasadnienie rekomendacji Aplikuj / Rozważ / Pomiń.",
+      "Po analizie zobaczysz oceny (łączny wynik, umiejętności, doświadczenie, domena, must-have, równoważność, pewność) oraz uzasadnienie rekomendacji: Aplikuj, Rozważ albo Pomiń.",
     analyzingEyebrow: "Analiza",
     analyzingTitle: "Czytam CV i ofertę…",
-    analyzingBody: "Ekstrakcja PDF → pobranie ogłoszenia → scoring",
-    errorTitle: "Nie udało się dokończyć",
+    analyzingBody: "Odczyt PDF → pobranie ogłoszenia → ocena dopasowania",
+    errorTitle: "Analiza się nie powiodła",
     eyebrow: "Wynik",
     jobLabel: "Oferta:",
     matched: "Wspólne",
-    coveredByEquivalence: "Pokryte równoważnymi skillami",
+    coveredByEquivalence: "Pokryte równoważnymi umiejętnościami",
     stillMissing: "Nadal brakuje",
     empty: "brak",
     recommendation: {
@@ -185,9 +200,9 @@ const pl: Messages = {
       maybe: "Rozważ",
       skip: "Pomiń",
     },
-    whyTitle: "Dlaczego ta rekomendacja",
-    metricsTitle: "Metryki dopasowania",
-    metricComposite: "Composite",
+    whyTitle: "Dlaczego taka rekomendacja",
+    metricsTitle: "Oceny dopasowania",
+    metricComposite: "Łączny wynik",
     metricSkills: "Umiejętności",
     metricExperience: "Doświadczenie",
     metricDomain: "Domena",
@@ -196,36 +211,37 @@ const pl: Messages = {
     metricConfidence: "Pewność",
     confidenceUnavailable: "brak (heurystyka)",
     weightsCaption:
-      "Wagi w kodzie: skills 35% · doświadczenie 25% · domena 20% · must-have 20%.",
+      "Wagi w kodzie: umiejętności 35% · doświadczenie 25% · domena 20% · must-have 20%.",
     heuristicCaption:
-      "Te same osie co Jev — wartości z pokrycia słów kluczowych i mapy synonimów, nie z modelu.",
+      "Te same kategorie co u Jev — wartości z pokrycia słów kluczowych i mapy synonimów, nie z modelu.",
     why: {
       applyBecause: (score) =>
-        `Rekomendacja Aplikuj, bo wynik composite wynosi ${score}/100 (próg ≥ 70).`,
+        `Rekomendacja: Aplikuj. Łączny wynik to ${score}/100 (próg co najmniej 70).`,
       maybeBecause: (score) =>
-        `Rekomendacja Rozważ, bo wynik composite wynosi ${score}/100 (próg 45–69).`,
+        `Rekomendacja: Rozważ. Łączny wynik to ${score}/100 (próg 45–69).`,
       skipBecause: (score) =>
-        `Rekomendacja Pomiń, bo wynik composite wynosi ${score}/100 (poniżej 45 albo twardy gate must-have).`,
+        `Rekomendacja: Pomiń. Łączny wynik to ${score}/100 (poniżej 45 albo twarde must-have nie są spełnione).`,
       mustHavesBlock: (pct) =>
-        `Must-have (Noul) na ${pct}/100 — poniżej progu 35, więc aplikowanie jest odcinane.`,
+        `Must-have: ${pct}/100 — poniżej progu 35, więc nie warto składać aplikacji.`,
       mustHavesOk: (pct) =>
-        `Must-have (Noul) na ${pct}/100 — twarde wymagania wyglądają na spełnione (≥ 50).`,
+        `Must-have: ${pct}/100 — twarde wymagania są spełnione (co najmniej 50).`,
       mustHavesSoft: (pct) =>
-        `Must-have (Noul) na ${pct}/100 — strefa graniczna (35–49).`,
+        `Must-have: ${pct}/100 — wynik na granicy (35–49).`,
       gapsRemain: (count, list) =>
-        `Po równoważności nadal brakuje ${count} wymagań: ${list}.`,
-      noGaps: "Po równoważności nie zostają otwarte luki skillowe.",
+        `Po uwzględnieniu równoważności nadal bez pokrycia — ${plWymagan(count)}: ${list}.`,
+      noGaps:
+        "Po uwzględnieniu równoważności nie ma już luk w umiejętnościach.",
       equivalenceCovered: (count, pct) =>
-        `${count} wymagań, które wyglądały na brak, jest pokrytych równoważnymi skillami (pokrycie ${pct}/100).`,
+        `Równoważność z CV pokrywa ${plWymagan(count)} z listy pozornie brakujących (pokrycie ${pct}/100).`,
       equivalenceLow: (pct) =>
-        `Pokrycie równoważnością jest niskie (${pct}/100) przy nadal otwartych lukach.`,
+        `Pokrycie przez równoważność jest niskie (${pct}/100), a luki nadal istnieją.`,
       criticalGaps: (pct) =>
-        `Noul istotnych luk po równoważności: ${pct}/100 (≥ 50 — luki nadal ważne).`,
+        `Istotne luki po równoważności: ${pct}/100 (od 50 wzwyż — luki nadal są istotne).`,
       confidenceLow: (pct) =>
-        `Średnia pewność Jev to ${pct}/100 (< 50) — wynik traktuj jako niepewny.`,
+        `Średnia pewność Jev to ${pct}/100 (poniżej 50) — ten wynik traktuj ostrożnie.`,
       confidenceOk: (pct) => `Średnia pewność Jev to ${pct}/100.`,
       heuristicNote:
-        "Brak pewności Jev — to szacunek heurystyczny, nie typed answers modelu.",
+        "Brak pewności z Jev — to szacunek z heurystyki, nie ocena modelu.",
     },
   },
   api: {
@@ -255,15 +271,15 @@ const pl: Messages = {
     summaryPartial: (gaps) =>
       `Częściowe dopasowanie. Warto podkreślić wspólne kompetencje i domknąć luki: ${gaps}.`,
     summaryWeak:
-      "Słabe dopasowanie względem tej oferty. CV i ogłoszenie mają mało wspólnych sygnałów kompetencji.",
+      "Słabe dopasowanie względem tej oferty. CV i ogłoszenie mają mało wspólnych kompetencji.",
     keywordsFallback: "istotne słowa kluczowe",
     missingFallback: "brakujące słowa kluczowe",
-    labelMatched: "Wspólne sygnały",
-    labelEquivalence: "Pokryte równoważnymi skillami",
+    labelMatched: "Wspólne",
+    labelEquivalence: "Pokryte równoważnymi umiejętnościami",
     labelMissing: "Nadal brakuje",
     labelMode: "Tryb dopasowania",
     modeDetail:
-      "Heurystyka + mapa synonimów (bez TYPESAFE_API_KEY). Z kluczem Jev ocenia równoważność skills.",
+      "Heurystyka i mapa synonimów (bez TYPESAFE_API_KEY). Z kluczem Jev ocenia równoważność umiejętności.",
   },
   typesafe: {
     levels: [
@@ -273,41 +289,41 @@ const pl: Messages = {
       "Dobre pokrycie",
       "Bardzo dobre pokrycie",
     ],
-    task: "Oceń dopasowanie CV kandydata do oferty pracy, w tym równoważność skills.",
+    task: "Oceń dopasowanie CV kandydata do oferty pracy, w tym równoważność umiejętności.",
     gapQuestion: (skill) =>
-      `Czy wymaganie skill „${skill}” z oferty jest pokryte przez równoważny, pokrewny lub transferowalny skill obecny w CV? Przykłady: TypeScript pokrywa JavaScript; Next.js pokrywa React; Spring pokrywa Java; Tailwind pokrywa CSS. Jeśli w CV jest bezpośrednio „${skill}”, też tak.`,
+      `Czy CV pokrywa wymaganie „${skill}” równoważną lub pokrewną umiejętnością? Przykłady: TypeScript pokrywa JavaScript; Next.js pokrywa React; Spring pokrywa Java; Tailwind pokrywa CSS. Jeśli w CV jest bezpośrednio „${skill}”, też tak.`,
     skillsFit:
-      "Jak dobrze umiejętności i stack z CV pokrywają wymagania oferty?",
+      "Jak dobrze umiejętności i zestaw technologii z CV pokrywają wymagania oferty?",
     experienceFit:
-      "Jak dobrze doświadczenie i seniority z CV pasują do oferty?",
+      "Jak dobrze doświadczenie i poziom stanowiska z CV pasują do oferty?",
     domainFit:
       "Jak dobrze domena / branża / kontekst CV pasuje do oferty?",
     meetsMustHaves:
-      "Czy CV spełnia twarde must-have wymagania tej oferty (języki, lata doświadczenia, obowiązkowe technologie)?",
+      "Czy CV spełnia twarde must-have tej oferty (języki, lata doświadczenia, obowiązkowe technologie)?",
     equivalenceCoverage:
-      "Po uwzględnieniu równoważności i transferowalności skills (np. TypeScript↔JavaScript, React↔Next.js, Java↔Spring, CSS↔Tailwind): jak dobrze CV pokrywa wymagania oferty, które wyglądają na brakujące przy prostym porównaniu stringów?",
+      "Po uwzględnieniu równoważności i pokrewnych umiejętności (np. TypeScript↔JavaScript, React↔Next.js, Java↔Spring, CSS↔Tailwind): jak dobrze CV pokrywa wymagania oferty, które przy dosłownym porównaniu tekstu wydają się nieobecne?",
     stillHasCriticalGaps:
-      "Czy po uwzględnieniu równoważnych i pokrewnych skills nadal brakuje istotnych technologii wymaganych w ofercie?",
+      "Czy po uwzględnieniu równoważnych i pokrewnych umiejętności nadal brakuje istotnych technologii wymaganych w ofercie?",
     recommendPrompt: "Czy kandydat powinien aplikować na tę ofertę?",
     recommendApply: "Tak — warto aplikować",
     recommendMaybe:
-      "Może — aplikować po dopracowaniu CV lub z zastrzeżeniami",
+      "Może — warto najpierw dopracować CV albo aplikować z pewnymi zastrzeżeniami",
     recommendSkip: "Nie — lepiej pominąć tę ofertę",
     summaryApply: (percent) =>
-      `Jev (composite) ocenia dopasowanie na ${percent}/100 — silne pokrycie umiejętności i must-have.`,
+      `Jev ocenia dopasowanie na ${percent}/100 — mocne pokrycie umiejętności i must-have.`,
     summaryMaybe: (percent) =>
-      `Jev (composite) ocenia dopasowanie na ${percent}/100 — częściowe pokrycie; warto dopracować CV.`,
+      `Jev ocenia dopasowanie na ${percent}/100 — częściowe pokrycie; warto dopracować CV.`,
     summarySkip: (percent) =>
-      `Jev (composite) ocenia dopasowanie na ${percent}/100 — słabe pokrycie względem tej oferty.`,
-    labelEquivalence: "Pokryte równoważnymi skillami",
+      `Jev ocenia dopasowanie na ${percent}/100 — słabe pokrycie względem tej oferty.`,
+    labelEquivalence: "Pokryte równoważnymi umiejętnościami",
     labelMissing: "Nadal brakuje",
-    labelEquivalenceNote: "Równoważność skills (Jev)",
-    labelComposite: "Wymiary composite",
-    labelMustHave: "Must-have (Noul)",
+    labelEquivalenceNote: "Równoważność umiejętności (Jev)",
+    labelComposite: "Składowe łącznego wyniku",
+    labelMustHave: "Must-have",
     labelWeights: "Wagi w kodzie",
     criticalGapsFallback: (p) =>
-      `P(istotne luki po równoważności)=${p}`,
-    fallbackLabel: "Fallback",
+      `Prawdopodobieństwo istotnych luk po równoważności: ${p}`,
+    fallbackLabel: "Tryb zapasowy",
     fallbackDetail:
       "Wywołanie TypeSafe/Jev nie powiodło się — użyto heurystyki słów kluczowych.",
   },
