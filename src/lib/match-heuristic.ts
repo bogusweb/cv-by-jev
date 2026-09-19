@@ -1,3 +1,4 @@
+import { getMessages, parseLocale, type Locale } from "@/lib/i18n";
 import { splitBySynonymEquivalence } from "@/lib/skill-equivalence";
 import type {
   MatchHighlight,
@@ -206,14 +207,20 @@ function summaryFor(
   score: number,
   matched: string[],
   missing: string[],
+  locale: Locale,
 ): string {
+  const t = getMessages(locale).heuristic;
   if (score >= 70) {
-    return `Silne dopasowanie — CV pokrywa kluczowe wymagania oferty (${matched.slice(0, 4).join(", ") || "istotne słowa kluczowe"}).`;
+    return t.summaryStrong(
+      matched.slice(0, 4).join(", ") || t.keywordsFallback,
+    );
   }
   if (score >= 45) {
-    return `Częściowe dopasowanie. Warto podkreślić wspólne kompetencje i domknąć luki: ${missing.slice(0, 4).join(", ") || "brakujące słowa kluczowe"}.`;
+    return t.summaryPartial(
+      missing.slice(0, 4).join(", ") || t.missingFallback,
+    );
   }
-  return `Słabe dopasowanie względem tej oferty. CV i ogłoszenie mają mało wspólnych sygnałów kompetencji.`;
+  return t.summaryWeak;
 }
 
 export function scoreHeuristicMatch(input: {
@@ -221,7 +228,10 @@ export function scoreHeuristicMatch(input: {
   jobText: string;
   jobUrl: string;
   jobTitle?: string;
+  locale?: Locale;
 }): MatchResult {
+  const locale = parseLocale(input.locale);
+  const t = getMessages(locale).heuristic;
   const cvSkills = extractSkillCandidates(input.cvText);
   const jobSkills = extractSkillCandidates(input.jobText);
 
@@ -258,7 +268,7 @@ export function scoreHeuristicMatch(input: {
   if (matchedSkills.length) {
     highlights.push({
       kind: "match",
-      label: "Wspólne sygnały",
+      label: t.labelMatched,
       detail: matchedSkills.slice(0, 8).join(", "),
     });
   }
@@ -266,7 +276,7 @@ export function scoreHeuristicMatch(input: {
   if (coveredByEquivalence.length) {
     highlights.push({
       kind: "match",
-      label: "Pokryte równoważnymi skillami",
+      label: t.labelEquivalence,
       detail: coveredByEquivalence.slice(0, 8).join(", "),
     });
   }
@@ -274,22 +284,26 @@ export function scoreHeuristicMatch(input: {
   if (stillMissing.length) {
     highlights.push({
       kind: "gap",
-      label: "Nadal brakuje",
+      label: t.labelMissing,
       detail: stillMissing.slice(0, 8).join(", "),
     });
   }
 
   highlights.push({
     kind: "note",
-    label: "Tryb dopasowania",
-    detail:
-      "Heurystyka + mapa synonimów (bez TYPESAFE_API_KEY). Z kluczem Jev ocenia równoważność skills.",
+    label: t.labelMode,
+    detail: t.modeDetail,
   });
 
   return {
     score: normalizedScore,
     recommendation: recommendationFor(normalizedScore),
-    summary: summaryFor(normalizedScore, matchedSkills, stillMissing),
+    summary: summaryFor(
+      normalizedScore,
+      matchedSkills,
+      stillMissing,
+      locale,
+    ),
     highlights,
     matchedSkills: matchedSkills.slice(0, 16),
     missingSkills: naiveMissing.slice(0, 12),
