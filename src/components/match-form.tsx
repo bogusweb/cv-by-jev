@@ -8,7 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import type { MatchErrorBody, MatchResult } from "@/lib/types";
+import { explainMatchWhy } from "@/lib/match-explain";
+import type { Messages } from "@/lib/i18n/messages";
+import type {
+  MatchErrorBody,
+  MatchRecommendation,
+  MatchResult,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type UiState = "idle" | "loading" | "error" | "result";
@@ -18,6 +24,259 @@ function normalizeJobUrl(raw: string): string {
   if (!trimmed) return "";
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   return `https://${trimmed}`;
+}
+
+function recTone(rec: MatchRecommendation) {
+  if (rec === "apply") {
+    return {
+      badge: "border-[var(--ink)] bg-[var(--lime)] text-[var(--ink)]",
+      bar: "bg-[var(--lime-strong)]",
+      ink: "text-[var(--ink)]",
+    };
+  }
+  if (rec === "maybe") {
+    return {
+      badge: "border-[var(--ink)] bg-[var(--caution)] text-white",
+      bar: "bg-[var(--caution)]",
+      ink: "text-[var(--caution)]",
+    };
+  }
+  return {
+    badge: "border-[var(--danger)] bg-[var(--danger)] text-white",
+    bar: "bg-[var(--danger)]",
+    ink: "text-[var(--danger)]",
+  };
+}
+
+function Meter({
+  label,
+  value,
+  fillClass,
+  suffix,
+}: {
+  label: string;
+  value: number | null;
+  fillClass: string;
+  suffix?: string;
+}) {
+  const numeric = value ?? 0;
+  const clamped = Math.min(100, Math.max(0, numeric));
+  const display =
+    value === null ? "—" : `${Math.round(clamped)}${suffix ?? ""}`;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--quiet)]">
+          {label}
+        </span>
+        <span className="font-mono text-sm tabular-nums text-[var(--ink)]">
+          {display}
+        </span>
+      </div>
+      <div className="h-2.5 w-full overflow-hidden border border-[var(--ink)]/20 bg-[var(--wash)]">
+        <div
+          className={cn("h-full transition-[width] duration-500", fillClass)}
+          style={{ width: value === null ? "0%" : `${clamped}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SkillGroup({
+  title,
+  items,
+  empty,
+  tone,
+}: {
+  title: string;
+  items: string[];
+  empty: string;
+  tone: "match" | "equiv" | "gap";
+}) {
+  return (
+    <div className={tone === "gap" ? "sm:col-span-2" : undefined}>
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--quiet)]">
+        {title}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {items.slice(0, 10).map((skill) => (
+          <Badge
+            key={`${tone}-${skill}`}
+            variant={tone === "gap" ? "outline" : "secondary"}
+            className={cn(
+              "rounded-none",
+              tone === "equiv" && "border border-[var(--lime)]/50 bg-[var(--lime-soft)]",
+              tone === "gap" && "border-[var(--danger)]/35 text-[var(--danger)]",
+            )}
+          >
+            {skill}
+          </Badge>
+        ))}
+        {items.length === 0 && (
+          <span className="text-sm text-[var(--quiet)]">{empty}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResultPanel({
+  result,
+  messages,
+}: {
+  result: MatchResult;
+  messages: Messages;
+}) {
+  const tone = recTone(result.recommendation);
+  const why = explainMatchWhy(result, messages);
+  const m = result.metrics;
+  const confidence =
+    typeof m.confidence === "number" ? m.confidence : null;
+
+  return (
+    <div className="relative space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-[0.22em] text-[var(--lime)]">
+            {messages.result.eyebrow}
+          </p>
+          <p className="font-display text-6xl leading-none tracking-tight text-[var(--ink)] sm:text-7xl">
+            {result.score}
+            <span className="text-3xl text-[var(--quiet)]">/100</span>
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge className={cn("rounded-none border", tone.badge)}>
+            {messages.result.recommendation[result.recommendation]}
+          </Badge>
+          <Badge
+            variant="outline"
+            className="rounded-none border-[var(--ink)]/30 text-[var(--ink)]"
+          >
+            {result.provider === "typesafe"
+              ? `Jev · ${result.model ?? "jev-latest"}`
+              : "heuristic"}
+          </Badge>
+        </div>
+      </div>
+
+      {result.jobTitle && (
+        <p className="text-sm text-[var(--quiet)]">
+          {messages.result.jobLabel}{" "}
+          <span className="text-[var(--ink)]">{result.jobTitle}</span>
+        </p>
+      )}
+
+      <Meter
+        label={messages.result.metricComposite}
+        value={m.composite}
+        fillClass={tone.bar}
+      />
+
+      <div className="border border-[var(--ink)]/15 bg-[var(--wash)]/80 p-4 sm:p-5">
+        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--lime)]">
+          {messages.result.whyTitle}
+        </p>
+        <ol className="mt-3 space-y-2.5">
+          {why.map((reason) => (
+            <li
+              key={reason}
+              className="border-l-2 border-[var(--lime)] pl-3 text-sm leading-relaxed text-[var(--ink)]"
+            >
+              {reason}
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div>
+        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--quiet)]">
+          {messages.result.metricsTitle}
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Meter
+            label={messages.result.metricSkills}
+            value={m.skills}
+            fillClass="bg-[var(--ink)]"
+          />
+          <Meter
+            label={messages.result.metricExperience}
+            value={m.experience}
+            fillClass="bg-[var(--ink)]"
+          />
+          <Meter
+            label={messages.result.metricDomain}
+            value={m.domain}
+            fillClass="bg-[var(--ink)]"
+          />
+          <Meter
+            label={messages.result.metricMustHaves}
+            value={m.mustHaves}
+            fillClass={
+              m.mustHaves < 35
+                ? "bg-[var(--danger)]"
+                : m.mustHaves < 50
+                  ? "bg-[var(--caution)]"
+                  : "bg-[var(--lime-strong)]"
+            }
+          />
+          <Meter
+            label={messages.result.metricEquivalence}
+            value={m.equivalenceCoverage}
+            fillClass="bg-[var(--lime-strong)]"
+          />
+          <Meter
+            label={messages.result.metricConfidence}
+            value={confidence}
+            fillClass={
+              confidence !== null && confidence < 50
+                ? "bg-[var(--caution)]"
+                : "bg-[var(--ink)]"
+            }
+            suffix={confidence === null ? undefined : ""}
+          />
+        </div>
+        {confidence === null && (
+          <p className="mt-2 text-xs text-[var(--quiet)]">
+            {messages.result.metricConfidence}:{" "}
+            {messages.result.confidenceUnavailable}
+          </p>
+        )}
+        <p className="mt-3 text-xs leading-relaxed text-[var(--quiet)]">
+          {result.provider === "typesafe"
+            ? messages.result.weightsCaption
+            : messages.result.heuristicCaption}
+        </p>
+      </div>
+
+      {(result.matchedSkills.length > 0 ||
+        result.coveredByEquivalence.length > 0 ||
+        result.stillMissing.length > 0) && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SkillGroup
+            title={messages.result.matched}
+            items={result.matchedSkills}
+            empty={messages.result.empty}
+            tone="match"
+          />
+          <SkillGroup
+            title={messages.result.coveredByEquivalence}
+            items={result.coveredByEquivalence}
+            empty={messages.result.empty}
+            tone="equiv"
+          />
+          <SkillGroup
+            title={messages.result.stillMissing}
+            items={result.stillMissing}
+            empty={messages.result.empty}
+            tone="gap"
+          />
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function MatchForm() {
@@ -262,129 +521,7 @@ export function MatchForm() {
         )}
 
         {uiState === "result" && result && (
-          <div className="relative space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p className="font-mono text-xs uppercase tracking-[0.22em] text-[var(--lime)]">
-                  {messages.result.eyebrow}
-                </p>
-                <p className="font-display text-6xl leading-none tracking-tight text-[var(--ink)] sm:text-7xl">
-                  {result.score}
-                  <span className="text-3xl text-[var(--quiet)]">/100</span>
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge className="rounded-none border border-[var(--ink)] bg-[var(--lime)] text-[var(--ink)]">
-                  {messages.result.recommendation[result.recommendation]}
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="rounded-none border-[var(--ink)]/30 text-[var(--ink)]"
-                >
-                  {result.provider === "typesafe"
-                    ? `Jev · ${result.model ?? "jev-latest"}`
-                    : "heuristic"}
-                </Badge>
-              </div>
-            </div>
-
-            {result.jobTitle && (
-              <p className="text-sm text-[var(--quiet)]">
-                {messages.result.jobLabel}{" "}
-                <span className="text-[var(--ink)]">{result.jobTitle}</span>
-              </p>
-            )}
-
-            <p className="text-lg leading-relaxed text-[var(--ink)]">
-              {result.summary}
-            </p>
-
-            <Progress value={result.score} className="h-2" />
-
-            <ul className="space-y-3">
-              {result.highlights.map((item) => (
-                <li
-                  key={`${item.label}-${item.detail}`}
-                  className="border-l-2 border-[var(--lime)] pl-3"
-                >
-                  <p className="text-sm font-medium text-[var(--ink)]">
-                    {item.label}
-                  </p>
-                  <p className="text-sm text-[var(--quiet)]">{item.detail}</p>
-                </li>
-              ))}
-            </ul>
-
-            {(result.matchedSkills.length > 0 ||
-              result.coveredByEquivalence.length > 0 ||
-              result.stillMissing.length > 0) && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--quiet)]">
-                    {messages.result.matched}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {result.matchedSkills.slice(0, 10).map((skill) => (
-                      <Badge
-                        key={skill}
-                        variant="secondary"
-                        className="rounded-none"
-                      >
-                        {skill}
-                      </Badge>
-                    ))}
-                    {result.matchedSkills.length === 0 && (
-                      <span className="text-sm text-[var(--quiet)]">
-                        {messages.result.empty}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--quiet)]">
-                    {messages.result.coveredByEquivalence}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {result.coveredByEquivalence.slice(0, 10).map((skill) => (
-                      <Badge
-                        key={`eq-${skill}`}
-                        variant="secondary"
-                        className="rounded-none border border-[var(--lime)]/40"
-                      >
-                        {skill}
-                      </Badge>
-                    ))}
-                    {result.coveredByEquivalence.length === 0 && (
-                      <span className="text-sm text-[var(--quiet)]">
-                        {messages.result.empty}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="sm:col-span-2">
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--quiet)]">
-                    {messages.result.stillMissing}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {result.stillMissing.slice(0, 10).map((skill) => (
-                      <Badge
-                        key={`miss-${skill}`}
-                        variant="outline"
-                        className="rounded-none"
-                      >
-                        {skill}
-                      </Badge>
-                    ))}
-                    {result.stillMissing.length === 0 && (
-                      <span className="text-sm text-[var(--quiet)]">
-                        {messages.result.empty}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <ResultPanel result={result} messages={messages} />
         )}
       </section>
     </div>

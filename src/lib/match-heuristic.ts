@@ -1,4 +1,5 @@
 import { getMessages, parseLocale, type Locale } from "@/lib/i18n";
+import { toPercent } from "@/lib/match-explain";
 import { splitBySynonymEquivalence } from "@/lib/skill-equivalence";
 import type {
   MatchHighlight,
@@ -7,154 +8,11 @@ import type {
 } from "@/lib/types";
 
 const STOPWORDS = new Set([
-  "a",
-  "an",
-  "and",
-  "are",
-  "as",
-  "at",
-  "be",
-  "by",
-  "for",
-  "from",
-  "in",
-  "is",
-  "it",
-  "of",
-  "on",
-  "or",
-  "that",
-  "the",
-  "to",
-  "with",
-  "your",
-  "you",
-  "we",
-  "our",
-  "this",
-  "will",
-  "have",
-  "has",
-  "i",
-  "my",
-  "me",
-  "and",
-  "oraz",
-  "się",
-  "jest",
-  "nie",
-  "dla",
-  "na",
-  "w",
-  "z",
-  "do",
-  "po",
-  "od",
-  "jak",
-  "czy",
-  "że",
-  "być",
-  "praca",
-  "stanowisko",
-  "oferta",
-  "team",
-  "role",
-  "job",
-  "work",
-  "experience",
-  "years",
-  "year",
-  "ability",
-  "skills",
-  "requirements",
-  "required",
-  "preferred",
-  "plus",
+  "a","an","and","are","as","at","be","by","for","from","in","is","it","of","on","or","that","the","to","with","your","you","we","our","this","will","have","has","i","my","me","and","oraz","się","jest","nie","dla","na","w","z","do","po","od","jak","czy","że","być","praca","stanowisko","oferta","team","role","job","work","experience","years","year","ability","skills","requirements","required","preferred","plus",
 ]);
 
 const SKILL_HINTS = [
-  "typescript",
-  "javascript",
-  "python",
-  "java",
-  "kotlin",
-  "swift",
-  "go",
-  "rust",
-  "c++",
-  "c#",
-  "react",
-  "next.js",
-  "nextjs",
-  "vue",
-  "angular",
-  "node",
-  "nodejs",
-  "express",
-  "nestjs",
-  "django",
-  "flask",
-  "fastapi",
-  "spring",
-  "sql",
-  "postgres",
-  "postgresql",
-  "mysql",
-  "mongodb",
-  "redis",
-  "graphql",
-  "rest",
-  "api",
-  "aws",
-  "gcp",
-  "azure",
-  "docker",
-  "kubernetes",
-  "k8s",
-  "terraform",
-  "ci/cd",
-  "git",
-  "linux",
-  "tailwind",
-  "css",
-  "html",
-  "figma",
-  "ux",
-  "ui",
-  "design",
-  "product",
-  "agile",
-  "scrum",
-  "leadership",
-  "communication",
-  "testing",
-  "jest",
-  "cypress",
-  "playwright",
-  "ml",
-  "ai",
-  "llm",
-  "data",
-  "analytics",
-  "security",
-  "devops",
-  "backend",
-  "frontend",
-  "fullstack",
-  "full-stack",
-  "mobile",
-  "ios",
-  "android",
-  "spark",
-  "hadoop",
-  "kafka",
-  "elasticsearch",
-  "webpack",
-  "vite",
-  "prisma",
-  "drizzle",
-  "supabase",
-  "firebase",
+  "typescript","javascript","python","java","kotlin","swift","go","rust","c++","c#","react","next.js","nextjs","vue","angular","node","nodejs","express","nestjs","django","flask","fastapi","spring","sql","postgres","postgresql","mysql","mongodb","redis","graphql","rest","api","aws","gcp","azure","docker","kubernetes","k8s","terraform","ci/cd","git","linux","tailwind","css","html","figma","ux","ui","design","product","agile","scrum","leadership","communication","testing","jest","cypress","playwright","ml","ai","llm","data","analytics","security","devops","backend","frontend","fullstack","full-stack","mobile","ios","android","spark","hadoop","kafka","elasticsearch","webpack","vite","prisma","drizzle","supabase","firebase",
 ];
 
 function tokenize(text: string): string[] {
@@ -179,7 +37,6 @@ function uniquePreserve(items: string[]): string[] {
 
 function extractSkillCandidates(text: string): string[] {
   const lower = text.toLowerCase();
-  // Prefer whole-token / word-boundary hits for short skills (e.g. avoid "java" in "javascript").
   const hinted = SKILL_HINTS.filter((skill) => {
     if (skill.length <= 3) {
       const re = new RegExp(
@@ -247,7 +104,6 @@ export function scoreHeuristicMatch(input: {
     cvSkills,
   );
 
-  // Treat synonym-covered skills as soft matches for scoring.
   const effectiveMatched = matchedSkills.length + coveredByEquivalence.length;
   const overlapRatio =
     jobSkills.length === 0 ? 0 : effectiveMatched / jobSkills.length;
@@ -263,47 +119,39 @@ export function scoreHeuristicMatch(input: {
   const raw = overlapRatio * 55 + skillBoost * 45;
   const normalizedScore = Math.round(Math.min(100, Math.max(0, raw * 100)));
 
-  const highlights: MatchHighlight[] = [];
+  const mustHavesPct =
+    hintedJob.length === 0
+      ? toPercent(overlapRatio)
+      : toPercent(1 - stillMissing.length / Math.max(hintedJob.length, 1));
+  const eqDenom = coveredByEquivalence.length + stillMissing.length;
+  const equivalencePct =
+    eqDenom === 0 ? 100 : toPercent(coveredByEquivalence.length / eqDenom);
 
-  if (matchedSkills.length) {
-    highlights.push({
-      kind: "match",
-      label: t.labelMatched,
-      detail: matchedSkills.slice(0, 8).join(", "),
-    });
-  }
+  const nonSkillJob = jobSkills.filter(
+    (s) => !SKILL_HINTS.includes(s) && s.length >= 4,
+  );
+  const domainHits = nonSkillJob.filter((s) => cvSet.has(s)).length;
+  const domainPct =
+    nonSkillJob.length === 0
+      ? toPercent(overlapRatio)
+      : toPercent(domainHits / nonSkillJob.length);
 
-  if (coveredByEquivalence.length) {
-    highlights.push({
-      kind: "match",
-      label: t.labelEquivalence,
-      detail: coveredByEquivalence.slice(0, 8).join(", "),
-    });
-  }
-
-  if (stillMissing.length) {
-    highlights.push({
-      kind: "gap",
-      label: t.labelMissing,
-      detail: stillMissing.slice(0, 8).join(", "),
-    });
-  }
-
-  highlights.push({
-    kind: "note",
-    label: t.labelMode,
-    detail: t.modeDetail,
-  });
+  const highlights: MatchHighlight[] = [
+    { kind: "note", label: t.labelMode, detail: t.modeDetail },
+  ];
 
   return {
     score: normalizedScore,
     recommendation: recommendationFor(normalizedScore),
-    summary: summaryFor(
-      normalizedScore,
-      matchedSkills,
-      stillMissing,
-      locale,
-    ),
+    summary: summaryFor(normalizedScore, matchedSkills, stillMissing, locale),
+    metrics: {
+      composite: normalizedScore,
+      skills: toPercent(skillBoost),
+      experience: toPercent(overlapRatio),
+      domain: domainPct,
+      mustHaves: mustHavesPct,
+      equivalenceCoverage: equivalencePct,
+    },
     highlights,
     matchedSkills: matchedSkills.slice(0, 16),
     missingSkills: naiveMissing.slice(0, 12),

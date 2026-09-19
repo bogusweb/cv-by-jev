@@ -47,6 +47,34 @@ export type Messages = {
     stillMissing: string;
     empty: string;
     recommendation: Record<MatchRecommendation, string>;
+    whyTitle: string;
+    metricsTitle: string;
+    metricComposite: string;
+    metricSkills: string;
+    metricExperience: string;
+    metricDomain: string;
+    metricMustHaves: string;
+    metricEquivalence: string;
+    metricConfidence: string;
+    confidenceUnavailable: string;
+    weightsCaption: string;
+    heuristicCaption: string;
+    why: {
+      applyBecause: (score: number) => string;
+      maybeBecause: (score: number) => string;
+      skipBecause: (score: number) => string;
+      mustHavesBlock: (pct: number) => string;
+      mustHavesOk: (pct: number) => string;
+      mustHavesSoft: (pct: number) => string;
+      gapsRemain: (count: number, list: string) => string;
+      noGaps: string;
+      equivalenceCovered: (count: number, pct: number) => string;
+      equivalenceLow: (pct: number) => string;
+      criticalGaps: (pct: number) => string;
+      confidenceLow: (pct: number) => string;
+      confidenceOk: (pct: number) => string;
+      heuristicNote: string;
+    };
   };
   api: {
     invalidCv: string;
@@ -141,7 +169,7 @@ const pl: Messages = {
     idleEyebrow: "Wynik",
     idleTitle: "Tu pojawi się score",
     idleBody:
-      "Po wysłaniu zobaczysz procent dopasowania, rekomendację, wspólne sygnały oraz skills pokryte równoważnością vs nadal brakujące.",
+      "Po wysłaniu zobaczysz metryki (composite, skills, doświadczenie, domena, must-have, równoważność, pewność) oraz uzasadnienie rekomendacji Aplikuj / Rozważ / Pomiń.",
     analyzingEyebrow: "Analiza",
     analyzingTitle: "Czytam CV i ofertę…",
     analyzingBody: "Ekstrakcja PDF → pobranie ogłoszenia → scoring",
@@ -156,6 +184,48 @@ const pl: Messages = {
       apply: "Aplikuj",
       maybe: "Rozważ",
       skip: "Pomiń",
+    },
+    whyTitle: "Dlaczego ta rekomendacja",
+    metricsTitle: "Metryki dopasowania",
+    metricComposite: "Composite",
+    metricSkills: "Umiejętności",
+    metricExperience: "Doświadczenie",
+    metricDomain: "Domena",
+    metricMustHaves: "Must-have",
+    metricEquivalence: "Równoważność",
+    metricConfidence: "Pewność",
+    confidenceUnavailable: "brak (heurystyka)",
+    weightsCaption:
+      "Wagi w kodzie: skills 35% · doświadczenie 25% · domena 20% · must-have 20%.",
+    heuristicCaption:
+      "Te same osie co Jev — wartości z pokrycia słów kluczowych i mapy synonimów, nie z modelu.",
+    why: {
+      applyBecause: (score) =>
+        `Rekomendacja Aplikuj, bo wynik composite wynosi ${score}/100 (próg ≥ 70).`,
+      maybeBecause: (score) =>
+        `Rekomendacja Rozważ, bo wynik composite wynosi ${score}/100 (próg 45–69).`,
+      skipBecause: (score) =>
+        `Rekomendacja Pomiń, bo wynik composite wynosi ${score}/100 (poniżej 45 albo twardy gate must-have).`,
+      mustHavesBlock: (pct) =>
+        `Must-have (Noul) na ${pct}/100 — poniżej progu 35, więc aplikowanie jest odcinane.`,
+      mustHavesOk: (pct) =>
+        `Must-have (Noul) na ${pct}/100 — twarde wymagania wyglądają na spełnione (≥ 50).`,
+      mustHavesSoft: (pct) =>
+        `Must-have (Noul) na ${pct}/100 — strefa graniczna (35–49).`,
+      gapsRemain: (count, list) =>
+        `Po równoważności nadal brakuje ${count} wymagań: ${list}.`,
+      noGaps: "Po równoważności nie zostają otwarte luki skillowe.",
+      equivalenceCovered: (count, pct) =>
+        `${count} wymagań, które wyglądały na brak, jest pokrytych równoważnymi skillami (pokrycie ${pct}/100).`,
+      equivalenceLow: (pct) =>
+        `Pokrycie równoważnością jest niskie (${pct}/100) przy nadal otwartych lukach.`,
+      criticalGaps: (pct) =>
+        `Noul istotnych luk po równoważności: ${pct}/100 (≥ 50 — luki nadal ważne).`,
+      confidenceLow: (pct) =>
+        `Średnia pewność Jev to ${pct}/100 (< 50) — wynik traktuj jako niepewny.`,
+      confidenceOk: (pct) => `Średnia pewność Jev to ${pct}/100.`,
+      heuristicNote:
+        "Brak pewności Jev — to szacunek heurystyczny, nie typed answers modelu.",
     },
   },
   api: {
@@ -280,7 +350,7 @@ const en: Messages = {
     idleEyebrow: "Result",
     idleTitle: "Your score will show up here",
     idleBody:
-      "After submit you’ll see match %, recommendation, shared signals, skills covered by equivalence, and what’s still missing.",
+      "After submit you’ll see metrics (composite, skills, experience, domain, must-haves, equivalence, confidence) and why the recommendation is Apply / Consider / Skip.",
     analyzingEyebrow: "Analysis",
     analyzingTitle: "Reading CV and listing…",
     analyzingBody: "PDF extract → fetch listing → scoring",
@@ -295,6 +365,48 @@ const en: Messages = {
       apply: "Apply",
       maybe: "Consider",
       skip: "Skip",
+    },
+    whyTitle: "Why this recommendation",
+    metricsTitle: "Match metrics",
+    metricComposite: "Composite",
+    metricSkills: "Skills",
+    metricExperience: "Experience",
+    metricDomain: "Domain",
+    metricMustHaves: "Must-haves",
+    metricEquivalence: "Equivalence",
+    metricConfidence: "Confidence",
+    confidenceUnavailable: "n/a (heuristic)",
+    weightsCaption:
+      "Weights in code: skills 35% · experience 25% · domain 20% · must-haves 20%.",
+    heuristicCaption:
+      "Same axes as Jev — values from keyword overlap and the synonym map, not the model.",
+    why: {
+      applyBecause: (score) =>
+        `Recommendation is Apply because the composite score is ${score}/100 (threshold ≥ 70).`,
+      maybeBecause: (score) =>
+        `Recommendation is Consider because the composite score is ${score}/100 (threshold 45–69).`,
+      skipBecause: (score) =>
+        `Recommendation is Skip because the composite score is ${score}/100 (below 45 or a hard must-have gate).`,
+      mustHavesBlock: (pct) =>
+        `Must-haves (Noul) at ${pct}/100 — below the 35 gate, so applying is blocked.`,
+      mustHavesOk: (pct) =>
+        `Must-haves (Noul) at ${pct}/100 — hard requirements look met (≥ 50).`,
+      mustHavesSoft: (pct) =>
+        `Must-haves (Noul) at ${pct}/100 — borderline zone (35–49).`,
+      gapsRemain: (count, list) =>
+        `After equivalence, ${count} requirements remain open: ${list}.`,
+      noGaps: "After equivalence, no skill gaps remain open.",
+      equivalenceCovered: (count, pct) =>
+        `${count} requirements that looked missing are covered by equivalent skills (coverage ${pct}/100).`,
+      equivalenceLow: (pct) =>
+        `Equivalence coverage is low (${pct}/100) while gaps remain.`,
+      criticalGaps: (pct) =>
+        `Noul for critical gaps after equivalence: ${pct}/100 (≥ 50 — gaps still matter).`,
+      confidenceLow: (pct) =>
+        `Jev’s average confidence is ${pct}/100 (< 50) — treat this result as uncertain.`,
+      confidenceOk: (pct) => `Jev’s average confidence is ${pct}/100.`,
+      heuristicNote:
+        "No Jev confidence — this is a heuristic estimate, not typed model answers.",
     },
   },
   api: {
