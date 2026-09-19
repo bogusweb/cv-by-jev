@@ -1,5 +1,6 @@
 import { TypeSafeClient, choice, noul, score } from "@typesafe-ai/sdk";
 import { getMessages, parseLocale, type Locale } from "@/lib/i18n";
+import { toPercent } from "@/lib/match-explain";
 import type { MatchRecommendation, MatchResult } from "@/lib/types";
 import { scoreHeuristicMatch } from "@/lib/match-heuristic";
 import { EQUIVALENCE_NOUL_THRESHOLD } from "@/lib/skill-equivalence";
@@ -53,7 +54,6 @@ export async function scoreTypeSafeMatch(input: {
   const cv = input.cvText.slice(0, 12_000);
   const job = input.jobText.slice(0, 12_000);
 
-  // Heuristic first: candidate gaps for per-skill Noul (Jev cannot emit string lists).
   const heuristic = scoreHeuristicMatch({ ...input, locale });
   const candidateGaps = heuristic.missingSkills.slice(0, MAX_GAP_NOULS);
 
@@ -64,8 +64,6 @@ export async function scoreTypeSafeMatch(input: {
     ]),
   );
 
-  // Composite scoring + skill-equivalence judgment in one systemOne call.
-  // https://docs.typesafe.ai/patterns/composite-scoring.md
   const response = await client.systemOne({
     model: "jev-latest",
     state: {
@@ -121,11 +119,9 @@ export async function scoreTypeSafeMatch(input: {
       ? modelChoice
       : recommendationFromComposite(composite, mustHaves);
 
-  // If model recommendation conflicts strongly with must-haves, prefer hard gate
   const gatedRecommendation =
     mustHaves < 0.35 && recommendation === "apply" ? "maybe" : recommendation;
 
-  // Per-skill Noul → coveredByEquivalence / stillMissing (Jev is source of truth).
   const coveredByEquivalence: string[] = [];
   const stillMissing: string[] = [];
   for (let i = 0; i < candidateGaps.length; i++) {
@@ -140,7 +136,6 @@ export async function scoreTypeSafeMatch(input: {
     }
   }
 
-  // Gaps beyond MAX_GAP_NOULS: keep heuristic synonym judgment (no Noul asked).
   const overflowSet = new Set(heuristic.missingSkills.slice(MAX_GAP_NOULS));
   if (overflowSet.size) {
     for (const skill of heuristic.coveredByEquivalence) {
@@ -168,59 +163,21 @@ export async function scoreTypeSafeMatch(input: {
   const avgConfidence =
     confidences.reduce((a, b) => a + b, 0) / confidences.length;
 
-  const equivalenceHighlights = [];
-  if (coveredByEquivalence.length) {
-    equivalenceHighlights.push({
-      kind: "match" as const,
-      label: t.labelEquivalence,
-      detail: coveredByEquivalence.slice(0, 8).join(", "),
-    });
-  }
-  if (stillMissing.length || stillHasCriticalGaps >= 0.5) {
-    equivalenceHighlights.push({
-      kind: "gap" as const,
-      label: t.labelMissing,
-      detail:
-        stillMissing.slice(0, 8).join(", ") ||
-        t.criticalGapsFallback(stillHasCriticalGaps.toFixed(2)),
-    });
-  }
-  equivalenceHighlights.push({
-    kind: "note" as const,
-    label: t.labelEquivalenceNote,
-    detail: `equivalenceCoverage=${Math.round(equivalence * 100)}, P(criticalGaps)=${stillHasCriticalGaps.toFixed(2)}`,
-  });
-
   return {
     score: percent,
     recommendation: gatedRecommendation,
     summary,
-    highlights: [
-      {
-        kind: "match",
-        label: t.labelComposite,
-        detail: `skills=${Math.round(skills * 100)}, experience=${Math.round(experience * 100)}, domain=${Math.round(domain * 100)}, mustHaves=${Math.round(mustHaves * 100)}`,
-      },
-      {
-        kind: mustHaves >= 0.5 ? "match" : "gap",
-        label: t.labelMustHave,
-        detail: `P(must-have)=${mustHaves.toFixed(2)}`,
-      },
-      {
-        kind: "note",
-        label: t.labelWeights,
-        detail: `skills ${WEIGHTS.skills}, experience ${WEIGHTS.experience}, domain ${WEIGHTS.domain}, mustHaves ${WEIGHTS.mustHaves}`,
-      },
-      ...equivalenceHighlights,
-      ...heuristic.highlights
-        .filter(
-          (h) =>
-            h.kind !== "note" &&
-            h.label !== t.labelEquivalence &&
-            h.label !== t.labelMissing,
-        )
-        .slice(0, 1),
-    ],
+    metrics: {
+      composite: percent,
+      skills: toPercent(skills),
+      experience: toPercent(experience),
+      domain: toPercent(domain),
+      mustHaves: toPercent(mustHaves),
+      equivalenceCoverage: toPercent(equivalence),
+      confidence: toPercent(avgConfidence),
+      stillHasCriticalGaps: toPercent(stillHasCriticalGaps),
+    },
+    highlights: [],
     matchedSkills: heuristic.matchedSkills,
     missingSkills: heuristic.missingSkills,
     coveredByEquivalence: coveredByEquivalence.slice(0, 12),
