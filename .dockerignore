@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+out
+agent-tools
+*.md
+Dockerfile*
+docker-compose*
+.github
+.wrangler
+.dev.vars

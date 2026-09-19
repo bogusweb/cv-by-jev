@@ -1,26 +1,11 @@
 import * as cheerio from "cheerio";
-import { Readability } from "@mozilla/readability";
-import { JSDOM } from "jsdom";
 import { getMessages, parseLocale, type Locale } from "@/lib/i18n";
+import { JobFetchError, type JobDocument } from "@/lib/job-errors";
+
+export { JobFetchError, type JobDocument } from "@/lib/job-errors";
 
 const MIN_JOB_CHARS = 80;
 const FETCH_TIMEOUT_MS = 15_000;
-
-export class JobFetchError extends Error {
-  code: "JOB_FETCH" | "JOB_EMPTY";
-
-  constructor(message: string, code: "JOB_FETCH" | "JOB_EMPTY") {
-    super(message);
-    this.name = "JobFetchError";
-    this.code = code;
-  }
-}
-
-export interface JobDocument {
-  url: string;
-  title?: string;
-  text: string;
-}
 
 function assertHttpUrl(raw: string, locale: Locale): URL {
   const t = getMessages(locale).api;
@@ -47,8 +32,15 @@ function cleanText(value: string): string {
     .trim();
 }
 
-function extractWithReadability(html: string, url: string): JobDocument | null {
+async function extractWithReadability(
+  html: string,
+  url: string,
+): Promise<JobDocument | null> {
   try {
+    const [{ JSDOM }, { Readability }] = await Promise.all([
+      import("jsdom"),
+      import("@mozilla/readability"),
+    ]);
     const dom = new JSDOM(html, { url });
     const article = new Readability(dom.window.document).parse();
     if (!article?.textContent) return null;
@@ -142,7 +134,7 @@ export async function fetchJobListing(
   }
 
   const html = await response.text();
-  const readable = extractWithReadability(html, url.toString());
+  const readable = await extractWithReadability(html, url.toString());
   if (readable) return readable;
   return extractWithCheerio(html, url.toString(), lang);
 }

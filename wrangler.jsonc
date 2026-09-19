@@ -1,0 +1,10 @@
+{
+  "name": "cv-by-jev-api",
+  "main": "api-worker/index.ts",
+  "compatibility_date": "2026-09-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "alias": {
+    "@": "./src"
+  }
+}
