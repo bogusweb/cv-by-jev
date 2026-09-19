@@ -54,6 +54,7 @@ export async function scoreTypeSafeMatch(input: {
   const cv = input.cvText.slice(0, 12_000);
   const job = input.jobText.slice(0, 12_000);
 
+  // Heuristic first: candidate gaps for per-skill Noul (Jev cannot emit string lists).
   const heuristic = scoreHeuristicMatch({ ...input, locale });
   const candidateGaps = heuristic.missingSkills.slice(0, MAX_GAP_NOULS);
 
@@ -64,6 +65,8 @@ export async function scoreTypeSafeMatch(input: {
     ]),
   );
 
+  // Composite scoring + skill-equivalence judgment in one systemOne call.
+  // https://docs.typesafe.ai/patterns/composite-scoring.md
   const response = await client.systemOne({
     model: "jev-latest",
     state: {
@@ -119,9 +122,11 @@ export async function scoreTypeSafeMatch(input: {
       ? modelChoice
       : recommendationFromComposite(composite, mustHaves);
 
+  // If model recommendation conflicts strongly with must-haves, prefer hard gate
   const gatedRecommendation =
     mustHaves < 0.35 && recommendation === "apply" ? "maybe" : recommendation;
 
+  // Per-skill Noul → coveredByEquivalence / stillMissing (Jev is source of truth).
   const coveredByEquivalence: string[] = [];
   const stillMissing: string[] = [];
   for (let i = 0; i < candidateGaps.length; i++) {
@@ -136,6 +141,7 @@ export async function scoreTypeSafeMatch(input: {
     }
   }
 
+  // Gaps beyond MAX_GAP_NOULS: keep heuristic synonym judgment (no Noul asked).
   const overflowSet = new Set(heuristic.missingSkills.slice(MAX_GAP_NOULS));
   if (overflowSet.size) {
     for (const skill of heuristic.coveredByEquivalence) {
