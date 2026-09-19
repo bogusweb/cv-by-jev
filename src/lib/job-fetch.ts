@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
+import { getMessages, parseLocale, type Locale } from "@/lib/i18n";
 
 const MIN_JOB_CHARS = 80;
 const FETCH_TIMEOUT_MS = 15_000;
@@ -21,22 +22,17 @@ export interface JobDocument {
   text: string;
 }
 
-function assertHttpUrl(raw: string): URL {
+function assertHttpUrl(raw: string, locale: Locale): URL {
+  const t = getMessages(locale).api;
   let parsed: URL;
   try {
     parsed = new URL(raw);
   } catch {
-    throw new JobFetchError(
-      "Podaj prawidłowy adres URL oferty (http lub https).",
-      "JOB_FETCH",
-    );
+    throw new JobFetchError(t.jobInvalidUrl, "JOB_FETCH");
   }
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new JobFetchError(
-      "Obsługujemy tylko adresy http i https.",
-      "JOB_FETCH",
-    );
+    throw new JobFetchError(t.jobHttpOnly, "JOB_FETCH");
   }
 
   return parsed;
@@ -70,7 +66,12 @@ function extractWithReadability(html: string, url: string): JobDocument | null {
   }
 }
 
-function extractWithCheerio(html: string, url: string): JobDocument {
+function extractWithCheerio(
+  html: string,
+  url: string,
+  locale: Locale,
+): JobDocument {
+  const t = getMessages(locale).api;
   const $ = cheerio.load(html);
   $("script, style, noscript, svg, iframe, nav, footer, header").remove();
 
@@ -93,21 +94,23 @@ function extractWithCheerio(html: string, url: string): JobDocument {
   );
 
   if (text.length < MIN_JOB_CHARS) {
-    throw new JobFetchError(
-      "Strona oferty nie zawiera wystarczającej ilości tekstu do analizy.",
-      "JOB_EMPTY",
-    );
+    throw new JobFetchError(t.jobEmpty, "JOB_EMPTY");
   }
 
   return { url, title, text };
 }
 
-export async function fetchJobListing(rawUrl: string): Promise<JobDocument> {
+export async function fetchJobListing(
+  rawUrl: string,
+  locale: Locale = "pl",
+): Promise<JobDocument> {
+  const lang = parseLocale(locale);
+  const t = getMessages(lang).api;
   const trimmed = rawUrl.trim();
   const withScheme = /^https?:\/\//i.test(trimmed)
     ? trimmed
     : `https://${trimmed}`;
-  const url = assertHttpUrl(withScheme);
+  const url = assertHttpUrl(withScheme, lang);
 
   let response: Response;
   try {
@@ -121,17 +124,11 @@ export async function fetchJobListing(rawUrl: string): Promise<JobDocument> {
       },
     });
   } catch {
-    throw new JobFetchError(
-      "Nie udało się pobrać oferty. Sprawdź adres URL i spróbuj ponownie.",
-      "JOB_FETCH",
-    );
+    throw new JobFetchError(t.jobFetchFailed, "JOB_FETCH");
   }
 
   if (!response.ok) {
-    throw new JobFetchError(
-      `Serwer oferty zwrócił błąd HTTP ${response.status}.`,
-      "JOB_FETCH",
-    );
+    throw new JobFetchError(t.jobHttpStatus(response.status), "JOB_FETCH");
   }
 
   const contentType = response.headers.get("content-type") ?? "";
@@ -141,14 +138,11 @@ export async function fetchJobListing(rawUrl: string): Promise<JobDocument> {
     !contentType.includes("application/xhtml") &&
     !contentType.includes("text/plain")
   ) {
-    throw new JobFetchError(
-      "Adres nie wygląda na stronę HTML z ogłoszeniem.",
-      "JOB_FETCH",
-    );
+    throw new JobFetchError(t.jobNotHtml, "JOB_FETCH");
   }
 
   const html = await response.text();
   const readable = extractWithReadability(html, url.toString());
   if (readable) return readable;
-  return extractWithCheerio(html, url.toString());
+  return extractWithCheerio(html, url.toString(), lang);
 }

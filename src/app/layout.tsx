@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { AppProviders } from "@/components/app-providers";
+import { getMessages } from "@/lib/i18n";
 import "./globals.css";
 
 const display = Fraunces({
@@ -19,19 +21,26 @@ const mono = IBM_Plex_Mono({
   weight: ["400", "500"],
 });
 
+const defaultMessages = getMessages("pl");
+
 export const metadata: Metadata = {
   title: "CV By Jev",
-  description:
-    "Dopasuj CV PDF do oferty pracy z Jev (TypeSafe) — lokalnie działa też heurystyka.",
+  description: defaultMessages.meta.description,
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html
       lang="pl"
       className={`${display.variable} ${sans.variable} ${mono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        <AppProviders>{children}</AppProviders>
+      </body>
     </html>
   );
 }

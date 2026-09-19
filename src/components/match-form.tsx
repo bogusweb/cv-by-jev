@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { FileUp, Link2, Loader2, Sparkles } from "lucide-react";
+import { useLocale } from "@/components/locale-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -12,12 +13,6 @@ import { cn } from "@/lib/utils";
 
 type UiState = "idle" | "loading" | "error" | "result";
 
-const RECOMMENDATION_LABEL: Record<MatchResult["recommendation"], string> = {
-  apply: "Aplikuj",
-  maybe: "Rozważ",
-  skip: "Pomiń",
-};
-
 function normalizeJobUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
@@ -26,6 +21,7 @@ function normalizeJobUrl(raw: string): string {
 }
 
 export function MatchForm() {
+  const { locale, messages } = useLocale();
   const formRef = useRef<HTMLFormElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [jobUrl, setJobUrl] = useState("");
@@ -48,17 +44,18 @@ export function MatchForm() {
     const normalizedUrl = normalizeJobUrl(String(data.get("jobUrl") ?? ""));
 
     if (!(file instanceof File) || file.size === 0) {
-      setError("Dołącz plik PDF z CV.");
+      setError(messages.form.missingCv);
       setUiState("error");
       return;
     }
     if (!normalizedUrl) {
-      setError("Wklej adres URL oferty pracy.");
+      setError(messages.form.missingUrl);
       setUiState("error");
       return;
     }
 
     data.set("jobUrl", normalizedUrl);
+    data.set("locale", locale);
     setJobUrl(normalizedUrl);
     setError(null);
     setResult(null);
@@ -74,9 +71,7 @@ export function MatchForm() {
 
         if (!response.ok) {
           const message =
-            "error" in payload
-              ? payload.error
-              : "Nie udało się dopasować CV do oferty.";
+            "error" in payload ? payload.error : messages.form.matchFailed;
           setError(message);
           setUiState("error");
           return;
@@ -85,7 +80,7 @@ export function MatchForm() {
         setResult(payload as MatchResult);
         setUiState("result");
       } catch {
-        setError("Błąd sieci. Sprawdź połączenie i spróbuj ponownie.");
+        setError(messages.form.networkError);
         setUiState("error");
       }
     });
@@ -124,20 +119,17 @@ export function MatchForm() {
       >
         <div className="space-y-2">
           <p className="font-mono text-xs uppercase tracking-[0.22em] text-[var(--lime)]">
-            Krok 1–2
+            {messages.form.steps}
           </p>
           <h2 className="font-display text-3xl tracking-tight text-[var(--ink)] sm:text-4xl">
-            Wgraj CV i wklej ofertę
+            {messages.form.title}
           </h2>
-          <p className="max-w-prose text-[var(--quiet)]">
-            Porównamy tekst CV z treścią ogłoszenia. Bez klucza TypeSafe działa
-            heurystyka; z kluczem — Jev.
-          </p>
+          <p className="max-w-prose text-[var(--quiet)]">{messages.form.blurb}</p>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="cv" className="text-[var(--ink)]">
-            Plik CV (PDF)
+            {messages.form.cvLabel}
           </Label>
           <label
             htmlFor="cv"
@@ -152,10 +144,10 @@ export function MatchForm() {
               </span>
               <div>
                 <p className="font-medium text-[var(--ink)]">
-                  {fileName ?? "Wybierz PDF z warstwą tekstową"}
+                  {fileName ?? messages.form.cvPick}
                 </p>
                 <p className="text-sm text-[var(--quiet)]">
-                  Max 8 MB · skany bez OCR w MVP
+                  {messages.form.cvHint}
                 </p>
               </div>
             </div>
@@ -173,7 +165,7 @@ export function MatchForm() {
 
         <div className="space-y-2">
           <Label htmlFor="jobUrl" className="text-[var(--ink)]">
-            URL oferty pracy
+            {messages.form.jobLabel}
           </Label>
           <div className="relative">
             <Link2 className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[var(--quiet)]" />
@@ -203,12 +195,12 @@ export function MatchForm() {
           {busy ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              Dopasowuję…
+              {messages.form.submitting}
             </>
           ) : (
             <>
               <Sparkles className="size-4" />
-              Sprawdź dopasowanie
+              {messages.form.submit}
             </>
           )}
         </button>
@@ -231,14 +223,13 @@ export function MatchForm() {
         {uiState === "idle" && (
           <div className="relative flex h-full min-h-[240px] flex-col justify-end gap-3 animate-in fade-in duration-500">
             <p className="font-mono text-xs uppercase tracking-[0.22em] text-[var(--quiet)]">
-              Wynik
+              {messages.result.idleEyebrow}
             </p>
             <h3 className="font-display text-3xl text-[var(--ink)]">
-              Tu pojawi się score
+              {messages.result.idleTitle}
             </h3>
             <p className="max-w-sm text-[var(--quiet)]">
-              Po wysłaniu zobaczysz procent dopasowania, rekomendację, wspólne
-              sygnały oraz skills pokryte równoważnością vs nadal brakujące.
+              {messages.result.idleBody}
             </p>
           </div>
         )}
@@ -246,14 +237,14 @@ export function MatchForm() {
         {busy && (
           <div className="relative flex h-full min-h-[240px] flex-col justify-center gap-4 animate-in fade-in duration-300">
             <p className="font-mono text-xs uppercase tracking-[0.22em] text-[var(--lime)]">
-              Analiza
+              {messages.result.analyzingEyebrow}
             </p>
             <h3 className="font-display text-3xl text-[var(--ink)]">
-              Czytam CV i ofertę…
+              {messages.result.analyzingTitle}
             </h3>
             <Progress value={66} className="h-2" />
             <p className="text-sm text-[var(--quiet)]">
-              Ekstrakcja PDF → pobranie ogłoszenia → scoring
+              {messages.result.analyzingBody}
             </p>
           </div>
         )}
@@ -263,7 +254,7 @@ export function MatchForm() {
             variant="destructive"
             className="relative rounded-none border-[var(--danger)]/40 bg-[var(--danger-soft)] text-[var(--ink)] animate-in fade-in slide-in-from-bottom-2 duration-300"
           >
-            <AlertTitle>Nie udało się dokończyć</AlertTitle>
+            <AlertTitle>{messages.result.errorTitle}</AlertTitle>
             <AlertDescription className="text-[var(--ink)]/80">
               {error}
             </AlertDescription>
@@ -275,7 +266,7 @@ export function MatchForm() {
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="font-mono text-xs uppercase tracking-[0.22em] text-[var(--lime)]">
-                  Wynik
+                  {messages.result.eyebrow}
                 </p>
                 <p className="font-display text-6xl leading-none tracking-tight text-[var(--ink)] sm:text-7xl">
                   {result.score}
@@ -284,7 +275,7 @@ export function MatchForm() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge className="rounded-none border border-[var(--ink)] bg-[var(--lime)] text-[var(--ink)]">
-                  {RECOMMENDATION_LABEL[result.recommendation]}
+                  {messages.result.recommendation[result.recommendation]}
                 </Badge>
                 <Badge
                   variant="outline"
@@ -299,7 +290,7 @@ export function MatchForm() {
 
             {result.jobTitle && (
               <p className="text-sm text-[var(--quiet)]">
-                Oferta:{" "}
+                {messages.result.jobLabel}{" "}
                 <span className="text-[var(--ink)]">{result.jobTitle}</span>
               </p>
             )}
@@ -330,7 +321,7 @@ export function MatchForm() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--quiet)]">
-                    Wspólne
+                    {messages.result.matched}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {result.matchedSkills.slice(0, 10).map((skill) => (
@@ -343,13 +334,15 @@ export function MatchForm() {
                       </Badge>
                     ))}
                     {result.matchedSkills.length === 0 && (
-                      <span className="text-sm text-[var(--quiet)]">brak</span>
+                      <span className="text-sm text-[var(--quiet)]">
+                        {messages.result.empty}
+                      </span>
                     )}
                   </div>
                 </div>
                 <div>
                   <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--quiet)]">
-                    Pokryte równoważnymi skillami
+                    {messages.result.coveredByEquivalence}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {result.coveredByEquivalence.slice(0, 10).map((skill) => (
@@ -362,13 +355,15 @@ export function MatchForm() {
                       </Badge>
                     ))}
                     {result.coveredByEquivalence.length === 0 && (
-                      <span className="text-sm text-[var(--quiet)]">brak</span>
+                      <span className="text-sm text-[var(--quiet)]">
+                        {messages.result.empty}
+                      </span>
                     )}
                   </div>
                 </div>
                 <div className="sm:col-span-2">
                   <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--quiet)]">
-                    Nadal brakuje
+                    {messages.result.stillMissing}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {result.stillMissing.slice(0, 10).map((skill) => (
@@ -381,7 +376,9 @@ export function MatchForm() {
                       </Badge>
                     ))}
                     {result.stillMissing.length === 0 && (
-                      <span className="text-sm text-[var(--quiet)]">brak</span>
+                      <span className="text-sm text-[var(--quiet)]">
+                        {messages.result.empty}
+                      </span>
                     )}
                   </div>
                 </div>

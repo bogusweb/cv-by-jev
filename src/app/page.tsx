@@ -1,15 +1,24 @@
+"use client";
+
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { MatchForm } from "@/components/match-form";
+import { useLocale } from "@/components/locale-provider";
 
 export default function Home() {
+  const { messages } = useLocale();
+
   return (
     <div className="bg-atmosphere relative flex flex-1 flex-col overflow-hidden">
-      <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
+      <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
         <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-[var(--quiet)]">
-          Match · PDF · URL
+          {messages.chrome.tagline}
         </p>
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--ink)]/70">
-          TypeSafe Jev ready
-        </p>
+        <div className="flex items-center gap-3 sm:gap-5">
+          <p className="hidden font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--ink)]/70 sm:block">
+            {messages.chrome.ready}
+          </p>
+          <LanguageSwitcher />
+        </div>
       </header>
 
       <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-5 pb-16 sm:px-8">
@@ -18,11 +27,10 @@ export default function Home() {
             CV By Jev
           </p>
           <h1 className="hero-rise-delay mt-5 max-w-xl text-xl font-medium text-[var(--ink)] sm:text-2xl">
-            Sprawdź, czy Twoje CV pasuje do oferty.
+            {messages.hero.headline}
           </h1>
           <p className="hero-rise-delay-2 mt-3 max-w-lg text-[var(--quiet)]">
-            Wgraj PDF, wklej link do ogłoszenia — dostaniesz score, rekomendację
-            i konkretne sygnały dopasowania.
+            {messages.hero.sub}
           </p>
         </section>
 
@@ -32,7 +40,7 @@ export default function Home() {
       </main>
 
       <footer className="relative z-10 mx-auto w-full max-w-6xl px-5 py-6 text-sm text-[var(--quiet)] sm:px-8">
-        OCR skanów i pełny tuning wag composite — w kolejnych iteracjach.
+        {messages.chrome.footer}
       </footer>
     </div>
   );

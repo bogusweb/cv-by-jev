@@ -1,4 +1,5 @@
 import { extractText } from "unpdf";
+import { getMessages, parseLocale, type Locale } from "@/lib/i18n";
 
 const MIN_TEXT_CHARS = 40;
 
@@ -12,7 +13,12 @@ export class PdfExtractionError extends Error {
   }
 }
 
-export async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
+export async function extractPdfText(
+  buffer: ArrayBuffer,
+  locale: Locale = "pl",
+): Promise<string> {
+  const t = getMessages(parseLocale(locale)).api;
+
   try {
     const { text } = await extractText(new Uint8Array(buffer), {
       mergePages: true,
@@ -27,18 +33,12 @@ export async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
     const cleaned = normalized.replace(/\u0000/g, "").trim();
 
     if (cleaned.length < MIN_TEXT_CHARS) {
-      throw new PdfExtractionError(
-        "Nie udało się odczytać tekstu z PDF. Plik może być skanem albo obrazem — OCR dołączymy później. Wgraj CV z warstwą tekstową.",
-        "PDF_EMPTY",
-      );
+      throw new PdfExtractionError(t.pdfEmpty, "PDF_EMPTY");
     }
 
     return cleaned;
   } catch (error) {
     if (error instanceof PdfExtractionError) throw error;
-    throw new PdfExtractionError(
-      "Nie udało się przetworzyć pliku PDF. Sprawdź, czy to prawidłowy dokument.",
-      "PDF_PARSE",
-    );
+    throw new PdfExtractionError(t.pdfParse, "PDF_PARSE");
   }
 }

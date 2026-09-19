@@ -27,6 +27,10 @@ npm run dev
 
 Bez klucza endpoint `/api/match` zwraca `provider: "heuristic"`. Z kluczem — composite scoring przez Jev (`provider: "typesafe"`). Heurystyka zawsze działa w przeglądarce bez sekretów.
 
+## Języki
+
+UI i komunikaty API: **PL** / **EN** (przełącznik w nagłówku, zapis w `localStorage`). Domyślnie polski.
+
 ## Przepływ
 
 1. Wgraj CV PDF z warstwą tekstową.

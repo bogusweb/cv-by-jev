@@ -1,3 +1,4 @@
+import { getMessages, parseLocale, type Locale } from "@/lib/i18n";
 import { scoreHeuristicMatch } from "@/lib/match-heuristic";
 import {
   hasTypeSafeKey,
@@ -10,24 +11,28 @@ export async function runMatch(input: {
   jobText: string;
   jobUrl: string;
   jobTitle?: string;
+  locale?: Locale;
 }): Promise<MatchResult> {
+  const locale = parseLocale(input.locale);
+  const withLocale = { ...input, locale };
+
   if (!hasTypeSafeKey()) {
-    return scoreHeuristicMatch(input);
+    return scoreHeuristicMatch(withLocale);
   }
 
   try {
-    return await scoreTypeSafeMatch(input);
+    return await scoreTypeSafeMatch(withLocale);
   } catch (error) {
     console.error("TypeSafe match failed, falling back to heuristic:", error);
-    const fallback = scoreHeuristicMatch(input);
+    const fallback = scoreHeuristicMatch(withLocale);
+    const t = getMessages(locale).typesafe;
     return {
       ...fallback,
       highlights: [
         {
           kind: "note",
-          label: "Fallback",
-          detail:
-            "Wywołanie TypeSafe/Jev nie powiodło się — użyto heurystyki słów kluczowych.",
+          label: t.fallbackLabel,
+          detail: t.fallbackDetail,
         },
         ...fallback.highlights,
       ],
