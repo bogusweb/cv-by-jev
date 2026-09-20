@@ -1,0 +1,67 @@
+# One-shot recorder for the README match-flow GIF/WebM.
+# Runs on the demo branch (and workflow_dispatch). Commits docs/demo.*
+# with GITHUB_TOKEN so the push does not retrigger workflows.
+
+name: Record README demo
+
+on:
+  push:
+    branches: [cursor/readme-demo-c724]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: record-readme-demo
+  cancel-in-progress: true
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Skip if demo files exist
+        id: skip
+        run: |
+          if [ -f docs/demo.gif ] && [ -f docs/demo.webm ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node.js
+        if: steps.skip.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install ffmpeg
+        if: steps.skip.outputs.skip != 'true'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install Playwright
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          npm install --no-save playwright@1.51.0
+          npx playwright install --with-deps chromium
+
+      - name: Record match-flow demo
+        if: steps.skip.outputs.skip != 'true'
+        run: node scripts/record-readme-demo.mjs
+
+      - name: Commit demo files
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/demo.gif docs/demo.webm
+          if git diff --cached --quiet; then
+            echo "No demo files to commit"
+            exit 0
+          fi
+          git commit -m "Add README match-flow demo (GIF + WebM)"
+          git push
