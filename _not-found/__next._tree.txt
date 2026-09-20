@@ -1,0 +1,2 @@
+:HL["/cv-by-jev/_next/static/chunks/1ioz7kcdojox4.css","style"]
+0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"/_not-found","param":null,"prefetchHints":4192,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}}}},"staleTime":300,"buildId":"1k7U7PNxoybo2Oh1NbMbm"}
