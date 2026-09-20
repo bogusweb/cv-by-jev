@@ -4,6 +4,8 @@ Dopasuj **CV (PDF)** do **oferty pracy (URL)** przy użyciu modelu **Jev** (Type
 
 **Live:** [https://bogusweb.github.io/cv-by-jev/](https://bogusweb.github.io/cv-by-jev/)
 
+![CV By Jev — wgraj CV, wklej URL oferty, wynik (score, meters, WHY)](docs/demo.gif)
+
 ## Stack
 
 - Next.js (App Router) + TypeScript + Tailwind + shadcn/ui

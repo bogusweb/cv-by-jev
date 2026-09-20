@@ -1,0 +1,45 @@
+# Shrink the README GIF after Playwright records it.
+# Triggered by this file landing on the demo branch.
+
+name: Compress README demo
+
+on:
+  push:
+    branches: [cursor/readme-demo-c724]
+    paths:
+      - ".github/workflows/compress-demo.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Recompress GIF from WebM
+        run: |
+          test -f docs/demo.webm
+          ffmpeg -y -i docs/demo.webm \
+            -vf "fps=8,scale=720:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=48:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5" \
+            docs/demo.gif
+          ls -lh docs/demo.gif docs/demo.webm
+
+      - name: Commit compressed GIF
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/demo.gif
+          if git diff --cached --quiet; then
+            echo "GIF unchanged"
+            exit 0
+          fi
+          git commit -m "Compress README demo GIF for GitHub"
+          git push
